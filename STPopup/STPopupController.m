@@ -112,6 +112,7 @@ static NSMutableSet *_retainedPopupControllers;
     UILabel *_defaultTitleLabel;
     STPopupLeftBarItem *_defaultLeftBarItem;
     NSDictionary *_keyboardInfo;
+    UIEdgeInsets _safeAreaInsets;
     BOOL _observing;
     
     // Built-in transitioning
@@ -252,7 +253,9 @@ static NSMutableSet *_retainedPopupControllers;
         if (topViewController.isViewLoaded && topViewController.view.superview) {
             [UIView animateWithDuration:0.3 delay:0 usingSpringWithDamping:1 initialSpringVelocity:0 options:UIViewAnimationOptionCurveEaseInOut animations:^{
                 [self layoutContainerView];
-            } completion:nil];
+            } completion:^(BOOL finished) {
+                [self adjustContainerViewOrigin];
+            }];
         }
     }
 }
@@ -275,6 +278,9 @@ static NSMutableSet *_retainedPopupControllers;
     [_retainedPopupControllers addObject:self];
     
     viewController = viewController.tabBarController ? : viewController;
+    if (@available(iOS 11.0, *)) {
+        _safeAreaInsets = viewController.view.safeAreaInsets;
+    }
     [viewController presentViewController:_containerViewController animated:YES completion:completion];
 }
 
@@ -452,6 +458,7 @@ static NSMutableSet *_retainedPopupControllers;
             toTitleView = _defaultTitleLabel;
         }
         
+        fromTitleView.center = _navigationBar.center;
         [_navigationBar addSubview:fromTitleView];
         _navigationBar.topItem.titleView = toTitleView;
         toTitleView.alpha = 0;
@@ -525,6 +532,7 @@ static NSMutableSet *_retainedPopupControllers;
     CGFloat containerViewY = (_containerViewController.view.bounds.size.height - containerViewHeight) / 2;
     
     if (self.style == STPopupStyleBottomSheet) {
+        containerViewHeight += _safeAreaInsets.bottom;
         containerViewY = _containerViewController.view.bounds.size.height - containerViewHeight;
         containerViewHeight += STPopupBottomSheetExtraHeight;
     }
@@ -657,6 +665,7 @@ static NSMutableSet *_retainedPopupControllers;
         self->_containerView.alpha = 0;
     } completion:^(BOOL finished) {
         [self layoutContainerView];
+        [self updateNavigationBarAnimated:NO];
         [UIView animateWithDuration:0.2 delay:0 usingSpringWithDamping:1 initialSpringVelocity:0 options:UIViewAnimationOptionCurveEaseInOut animations:^{
             self->_containerView.alpha = 1;
         } completion:nil];
@@ -718,7 +727,7 @@ static NSMutableSet *_retainedPopupControllers;
     
     CGFloat offsetY = 0;
     if (self.style == STPopupStyleBottomSheet) {
-        offsetY = keyboardHeight;
+        offsetY = keyboardHeight - _safeAreaInsets.bottom;
     }
     else {
         CGFloat statusBarHeight = [UIApplication sharedApplication].statusBarFrame.size.height;
